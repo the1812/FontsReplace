@@ -1,0 +1,10 @@
+dist/
+node_modules/
+.venv/
+.ruff_cache/
+__pycache__/
+*.egg-info/
+.verification/
+replacement/
+fonts/
+original/

@@ -1,0 +1,115 @@
+[[families]]
+id = "segoe"
+names = ["Segoe UI"]
+files = ["segoeui.ttf","segoeuii.ttf","segoeuib.ttf","segoeuiz.ttf","segoeuil.ttf","seguili.ttf","segoeuisl.ttf","seguisli.ttf","seguisb.ttf","seguisbi.ttf","seguibl.ttf","seguibli.ttf","seguim.ttf","seguimi.ttf"]
+group = "en"
+regular_weights = [300,350]
+
+[[families.patches]]
+weight = 500
+style = "regular"
+output = "seguim.ttf"
+
+[[families.patches]]
+weight = 500
+style = "italic"
+output = "seguimi.ttf"
+
+[[families]]
+id = "segoe-variable"
+names = ["Segoe UI Variable","Segoe UI Variable Display","Segoe UI Variable Text","Segoe UI Variable Small"]
+files = ["SegUIVar.ttf","SegUIVarSemibold.ttf"]
+group = "en"
+regular_weights = [300,350]
+static_family = "Segoe UI Variable"
+
+[[families.patches]]
+weight = 600
+style = "regular"
+output = "SegUIVarSemibold.ttf"
+
+[[families]]
+id = "arial"
+names = ["Arial","Arial Black"]
+files = ["arial.ttf","ariali.ttf","arialbd.ttf","arialbi.ttf","ariblk.ttf"]
+group = "en"
+
+[[families]]
+id = "yahei"
+names = ["Microsoft YaHei","Microsoft YaHei UI"]
+files = ["msyh.ttc","msyhl.ttc","msyhbd.ttc","msyhm.ttc","msyhsbd.ttc"]
+group = "zh-Hans"
+regular_weights = [290,300]
+
+[[families.patches]]
+weight = 500
+style = "regular"
+output = "msyhm.ttc"
+
+[[families.patches]]
+weight = 600
+style = "regular"
+output = "msyhsbd.ttc"
+
+[[families]]
+id = "jhenghei"
+names = ["Microsoft JhengHei","Microsoft JhengHei UI"]
+files = ["msjh.ttc","msjhl.ttc","msjhbd.ttc","msjhm.ttc","msjhsbd.ttc"]
+group = "zh-Hant"
+
+[[families.patches]]
+weight = 500
+style = "regular"
+output = "msjhm.ttc"
+
+[[families.patches]]
+weight = 600
+style = "regular"
+output = "msjhsbd.ttc"
+
+[[families]]
+id = "simsun"
+names = ["SimSun","NSimSun","SimSun-ExtB","SimSun-ExtG"]
+files = ["simsun.ttc","simsunb.ttf","SimsunExtG.ttf"]
+group = "zh-Hans"
+
+[[families]]
+id = "dengxian"
+names = ["DengXian"]
+files = ["deng.ttf","dengl.ttf","dengb.ttf"]
+group = "zh-Hans"
+
+[[families]]
+id = "fangsong"
+names = ["FangSong"]
+files = ["simfang.ttf"]
+group = "zh-Hans"
+
+[[families]]
+id = "kaiti"
+names = ["KaiTi"]
+files = ["simkai.ttf"]
+group = "zh-Hans"
+
+[[families]]
+id = "simhei"
+names = ["SimHei"]
+files = ["simhei.ttf"]
+group = "zh-Hans"
+
+[[families]]
+id = "meiryo"
+names = ["Meiryo","Meiryo UI"]
+files = ["meiryo.ttc","meiryob.ttc","meiryom.ttc"]
+group = "ja"
+
+[[families.patches]]
+weight = 500
+style = "regular"
+output = "meiryom.ttc"
+
+[[families]]
+id = "ms-mincho"
+names = ["MS Mincho","MS PMincho"]
+files = ["msmincho.ttc"]
+group = "ja"

@@ -1,0 +1,15 @@
+input_dir = "../fonts"
+
+[[sources]]
+groups = ["en"]
+files = ["HarmonyOS_Sans_*.ttf"]
+exclude = ["HarmonyOS_Sans_SC_*"]
+
+[[sources]]
+groups = ["zh-Hans", "zh-Hant", "ja"]
+files = ["HarmonyOS_Sans_SC_*.ttf"]
+
+[[mappings]]
+target = "meiryo"
+style = "italic"
+group = "en"

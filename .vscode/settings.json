@@ -1,0 +1,29 @@
+{
+  "cSpell.words": [
+    "Jheng",
+    "Meiryo",
+    "Mincho",
+    "Segoe",
+    "Semilight"
+  ],
+  "cSpell.ignorePaths": [
+    ".venv",
+    "dist",
+    "fonts",
+    "original",
+    "replacement",
+    ".git/{info,lfs,logs,refs,objects}/**",
+    ".git/{index,*refs,*HEAD}",
+    ".vscode",
+    ".vscode-insiders"
+  ],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit"
+    },
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  }
+}
