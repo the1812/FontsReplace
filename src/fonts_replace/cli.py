@@ -67,12 +67,12 @@ def main() -> int:
     if args.command == "plan":
       print(json.dumps(plan, default=json_value, ensure_ascii=False, indent=2))
     else:
-      build(
+      result = build(
         plan,
         args.output,
         progress=lambda message: print(message, file=sys.stderr, flush=True),
       )
-      print(f"Generated {len(plan.outputs)} font files: {args.output.resolve()}")
+      print(json.dumps(result, default=json_value, ensure_ascii=False, indent=2))
     return 0
   except (ValueError, OSError, TTLibError, BadZipFile) as error:
     print(f"fonts_replace: {error}", file=sys.stderr)

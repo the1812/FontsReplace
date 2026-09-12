@@ -1,5 +1,4 @@
 import hashlib
-import json
 import platform
 from collections.abc import Callable
 from contextlib import ExitStack
@@ -22,13 +21,6 @@ def json_value(value):
   if is_dataclass(value):
     return asdict(value)
   raise TypeError(f"Cannot serialize {type(value).__name__}")
-
-
-def write_json(path: Path, value) -> None:
-  path.write_text(
-    json.dumps(value, default=json_value, ensure_ascii=False, indent=2) + "\n",
-    encoding="utf-8",
-  )
 
 
 def check_output(plan: Plan, output: Path) -> None:
@@ -173,6 +165,5 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
       manifest["outputs"].append(
         {"file": target.name, "sha256": digest(destination), "members": reports}
       )
-    write_json(delivery / "manifest.json", manifest)
     delivery.rename(output)
   return manifest
