@@ -164,6 +164,25 @@ def vertical_metrics(font: TTFont) -> dict[str, dict[str, int]]:
 
 
 def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
+  if task.family.casefold() == "segoe ui":
+    cmap = font.getBestCmap() or {}
+    ratio_name, colon_name = cmap.get(0x2236), cmap.get(0x003A)
+    if ratio_name and colon_name and ratio_name != colon_name:
+      glyph = font["glyf"][ratio_name]
+      width = font["hmtx"][colon_name][0]
+      if glyph.numberOfContours and font["hmtx"][ratio_name][0] > width:
+        left = round((width - (glyph.xMax - glyph.xMin)) / 2)
+        offset = left - glyph.xMin
+        if glyph.isComposite():
+          for component in glyph.components:
+            if hasattr(component, "x"):
+              component.x += offset
+        else:
+          glyph.coordinates.translate((offset, 0))
+        glyph.recalcBounds(font["glyf"])
+        font["hmtx"][ratio_name] = (width, left)
+  font.getTableData("glyf")
+  font["maxp"].recalc(font)
   transplant_names(font, template)
   derived = task.patch is not None or bool(task.template.axes)
   if derived:
@@ -197,6 +216,11 @@ def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
   for tag, fields in before.items():
     for field, value in fields.items():
       setattr(font[tag], field, round(value * ratio))
+  clipping_expanded = (
+    font["head"].yMax > os2.usWinAscent or -font["head"].yMin > os2.usWinDescent
+  )
+  os2.usWinAscent = max(os2.usWinAscent, font["head"].yMax)
+  os2.usWinDescent = max(os2.usWinDescent, -font["head"].yMin)
   os2.recalcUnicodeRanges(font)
   if os2.version >= 1:
     os2.recalcCodePageRanges(font)
@@ -210,13 +234,12 @@ def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
     os2.usBreakChar = 32 if 32 in codepoints else 0
   return {
     "metrics": {
-      "policy": "system",
+      "policy": "system-with-glyph-bounds",
       "scale": ratio,
       "original": before,
       "output": vertical_metrics(font),
       "use_typo_metrics": bool(os2.fsSelection & 128),
-      "exceeds_clipping": font["head"].yMax > os2.usWinAscent
-      or -font["head"].yMin > os2.usWinDescent,
+      "clipping_expanded": clipping_expanded,
     },
     "coverage": {
       "original": len(original_codepoints),

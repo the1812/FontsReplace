@@ -174,7 +174,13 @@ def make_plan(
     if selected
     else tuple(family for family in targets if family.enabled)
   )
-  system = scan_system(system_dir)
+  filenames = {name.casefold() for target in targets for name in target.files}
+  system = [
+    face
+    for path in font_paths(system_dir)
+    if path.name.casefold() in filenames
+    for face in scan_file(path)
+  ]
   sources = scan_sources(preset)
   by_file: dict[Path, list[Face]] = defaultdict(list)
   for face in system:
@@ -220,8 +226,12 @@ def make_plan(
 
   for target in targets:
     names = {name.casefold() for name in target.names}
-    members = [face for face in system if face.family.casefold() in names]
     candidates = {name.casefold() for name in target.files}
+    members = [
+      face
+      for face in system
+      if face.path.name.casefold() in candidates and face.family.casefold() in names
+    ]
     for path, faces in by_file.items():
       if path.name.casefold() in candidates and not any(
         face in members for face in faces

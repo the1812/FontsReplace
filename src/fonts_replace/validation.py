@@ -53,6 +53,11 @@ def validate(font: TTFont, expected: dict, replaced: bool) -> None:
       raise ValueError(f"Output validation failed: {detail}")
   if not replaced:
     return
+  if (
+    font["head"].yMax > font["OS/2"].usWinAscent
+    or -font["head"].yMin > font["OS/2"].usWinDescent
+  ):
+    raise ValueError("Output clipping metrics do not contain glyph bounds")
   if any(tag in font for tag in VARIABLE_TABLES) or "STAT" in font or "DSIG" in font:
     raise ValueError("Static output contains variable tables or an invalid signature")
   glyphs = set(font.getGlyphOrder())
