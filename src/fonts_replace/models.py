@@ -78,11 +78,19 @@ class Mapping:
 
 
 @dataclass(frozen=True)
+class Download:
+  url: str
+  sha256: str
+  directories: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Preset:
   path: Path
   input_dir: Path
   sources: tuple[Source, ...]
   mappings: tuple[Mapping, ...]
+  download: Download | None = None
 
 
 @dataclass(frozen=True)

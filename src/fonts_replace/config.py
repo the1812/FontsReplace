@@ -3,7 +3,7 @@ import tomllib
 from importlib.resources import files
 from pathlib import Path
 
-from .models import Family, Mapping, Patch, Preset, Source
+from .models import Download, Family, Mapping, Patch, Preset, Source
 
 
 def system_directory() -> Path:
@@ -53,6 +53,8 @@ def read_targets(path: Path | None) -> tuple[Family, ...]:
 
 
 def read_preset(path: Path, input_dir: Path | None = None) -> Preset:
+  if path.suffix == "" and path.parent == Path("."):
+    path = Path("presets") / f"{path.name}.toml"
   path = path.resolve()
   data = tomllib.loads(path.read_text(encoding="utf-8-sig"))
   directory = (
@@ -69,4 +71,13 @@ def read_preset(path: Path, input_dir: Path | None = None) -> Preset:
     for item in data["sources"]
   )
   mappings = tuple(Mapping(**item) for item in data.get("mappings", []))
-  return Preset(path, directory, sources, mappings)
+  download = data.get("download")
+  return Preset(
+    path,
+    directory,
+    sources,
+    mappings,
+    Download(download["url"], download["sha256"], tuple(download["directories"]))
+    if download
+    else None,
+  )

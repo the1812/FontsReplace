@@ -2,11 +2,13 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from zipfile import BadZipFile
 
 from fontTools.ttLib import TTLibError
 
 from .builder import build, json_value
 from .config import read_preset, read_targets, system_directory
+from .fetch import fetch
 from .inventory import font_paths, scan_file
 from .planner import make_plan
 
@@ -23,6 +25,9 @@ def main() -> int:
   )
   inspect.add_argument("--system-dir", type=Path, default=system_directory())
   inspect.add_argument("--input-dir", type=Path)
+  fetch_parser = subparsers.add_parser("fetch", help="Download a preset's fonts")
+  fetch_parser.add_argument("preset", type=Path)
+  fetch_parser.add_argument("--input-dir", type=Path)
   for command in ("plan", "build"):
     command_parser = subparsers.add_parser(command)
     command_parser.add_argument("--preset", type=Path, required=True)
@@ -51,6 +56,11 @@ def main() -> int:
       print(json.dumps(result, default=json_value, ensure_ascii=False, indent=2))
       return 0
     preset = read_preset(args.preset, args.input_dir)
+    if args.command == "fetch":
+      fetch(
+        preset, progress=lambda message: print(message, file=sys.stderr, flush=True)
+      )
+      return 0
     plan = make_plan(
       args.system_dir.resolve(), preset, read_targets(args.targets), args.family
     )
@@ -64,7 +74,7 @@ def main() -> int:
       )
       print(f"Generated {len(plan.outputs)} font files: {args.output.resolve()}")
     return 0
-  except (ValueError, OSError, TTLibError) as error:
+  except (ValueError, OSError, TTLibError, BadZipFile) as error:
     print(f"fonts_replace: {error}", file=sys.stderr)
     return 1
 

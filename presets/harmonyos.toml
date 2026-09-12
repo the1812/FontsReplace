@@ -1,9 +1,19 @@
 input_dir = "../fonts"
 
+[download]
+url = "https://developer.huawei.com/images/download/general/HarmonyOS-Sans.zip"
+sha256 = "fb02c86e358cd9aad8d4dfa957ee502381e7ee2e94499a9133add4324b6ce69a"
+directories = [
+  "HarmonyOS Sans/HarmonyOS_Sans",
+  "HarmonyOS Sans/HarmonyOS_Sans_Italic",
+  "HarmonyOS Sans/HarmonyOS_Sans_SC",
+]
+
 [[sources]]
 groups = ["en"]
 files = ["HarmonyOS_Sans_*.ttf"]
 exclude = ["HarmonyOS_Sans_SC_*"]
+families = ["HarmonyOS Sans"]
 
 [[sources]]
 groups = ["zh-Hans", "zh-Hant", "ja"]
