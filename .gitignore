@@ -5,6 +5,6 @@ node_modules/
 __pycache__/
 *.egg-info/
 .verification/
-replacement/
+replacements/
 fonts/
 original/

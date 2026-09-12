@@ -42,7 +42,7 @@ def main() -> int:
       help="Select a target id; repeat for multiple targets",
     )
     if command == "build":
-      command_parser.add_argument("--output", type=Path, required=True)
+      command_parser.add_argument("--output", type=Path, default=Path("replacements"))
   args = parser.parse_args()
   try:
     if args.command == "inspect":
