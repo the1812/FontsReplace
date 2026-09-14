@@ -7,6 +7,8 @@ name = "fonts_replace"
 version = "0.1.0"
 description = "Generate system-identity fonts from replacement TrueType faces"
 requires-python = ">=3.12"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 dependencies = ["fonttools>=4.58.4,<5"]
 
 [project.scripts]
