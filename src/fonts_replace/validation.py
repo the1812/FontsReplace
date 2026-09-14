@@ -37,7 +37,9 @@ def snapshot(font: TTFont) -> dict:
     "mac_style": font["head"].macStyle,
     "upem": font["head"].unitsPerEm,
     "metrics": vertical_metrics(font),
-    "tables": table_hashes(font, ("glyf", "hmtx", "cmap", "GSUB", "GPOS", "GDEF")),
+    "tables": table_hashes(
+      font, ("glyf", "hmtx", "cmap", "GSUB", "GPOS", "GDEF", "STAT", *VARIABLE_TABLES)
+    ),
   }
 
 
@@ -58,8 +60,12 @@ def validate(font: TTFont, expected: dict, replaced: bool) -> None:
     or -font["head"].yMin > font["OS/2"].usWinDescent
   ):
     raise ValueError("Output clipping metrics do not contain glyph bounds")
-  if any(tag in font for tag in VARIABLE_TABLES) or "STAT" in font or "DSIG" in font:
-    raise ValueError("Static output contains variable tables or an invalid signature")
+  if "DSIG" in font:
+    raise ValueError("Output contains an invalid signature")
+  if "fvar" not in font and (
+    any(tag in font for tag in VARIABLE_TABLES) or "STAT" in font
+  ):
+    raise ValueError("Static output contains variable tables")
   glyphs = set(font.getGlyphOrder())
   if not set((font.getBestCmap() or {}).values()) <= glyphs:
     raise ValueError("Output character map references missing glyphs")

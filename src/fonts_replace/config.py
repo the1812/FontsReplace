@@ -24,7 +24,8 @@ def read_targets(path: Path | None) -> tuple[Family, ...]:
       regular_weights=tuple(item.get("regular_weights", [])),
       patches=tuple(Patch(**patch) for patch in item.get("patches", [])),
       enabled=item.get("enabled", True),
-      static_family=item.get("static_family"),
+      variable_family=item.get("variable_family"),
+      variable_files=tuple(item.get("variable_files", [])),
     )
     for item in data["families"]
   )

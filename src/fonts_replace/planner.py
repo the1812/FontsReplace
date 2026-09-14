@@ -72,6 +72,7 @@ def select_source(
   family: str,
   weight: int,
   style: str,
+  prefer_variable: bool,
 ) -> tuple[Face, dict[str, float], str]:
   applicable = [
     mapping
@@ -133,14 +134,19 @@ def select_source(
   if not candidates:
     raise ValueError(f"No input face for {family} {weight} {style} (group {group})")
 
-  def score(face: Face) -> tuple[float, float, int]:
+  def score(face: Face) -> tuple[bool, float, float, int]:
     value = visual_weight
     if "wght" in face.axes:
       axis = face.axes["wght"]
       value = min(axis.maximum, max(axis.minimum, value))
     else:
       value = face.weight
-    return abs(value - visual_weight), value, abs(face.width - template.width)
+    return (
+      prefer_variable and not face.axes,
+      abs(value - visual_weight),
+      value,
+      abs(face.width - template.width),
+    )
 
   best = min(map(score, candidates))
   candidates = [face for face in candidates if score(face) == best]
@@ -152,6 +158,8 @@ def select_source(
   face = candidates[0]
   require_truetype(face)
   axes = coordinates(face, visual_weight, source_style, mapping.axes if mapping else {})
+  if prefer_variable and face.axes:
+    axes = {tag: axes[tag] for tag in mapping.axes} if mapping else {}
   reason = "mapping" if mapping else f"group:{group}"
   if weight in target.regular_weights:
     reason += "; readability:Regular"
@@ -200,8 +208,22 @@ def make_plan(
   ) -> Task:
     require_truetype(face)
     source, axes, reason = select_source(
-      preset, sources, target, face, family, weight, style
+      preset,
+      sources,
+      target,
+      face,
+      family,
+      weight,
+      style,
+      patch is None
+      and (
+        bool(face.axes)
+        or face.path.name.casefold()
+        in {name.casefold() for name in target.variable_files}
+      ),
     )
+    if source.axes.keys() - axes.keys():
+      weight = round(axes["wght"]) if "wght" in axes else source.weight
     task = Task(
       target,
       face,
@@ -246,15 +268,15 @@ def make_plan(
     for face in members:
       if face.key in assigned:
         raise ValueError(f"Face selected by multiple targets: {face.label}")
-      family = target.static_family or face.family
+      family = target.variable_family or face.family
       weight = 400 if face.axes else face.weight
       assigned[face.key] = task_for(target, face, family, weight, face.style)
 
     for family in dict.fromkeys(
-      target.static_family or face.family for face in members
+      target.variable_family or face.family for face in members
     ):
       family_faces = [
-        face for face in members if (target.static_family or face.family) == family
+        face for face in members if (target.variable_family or face.family) == family
       ]
       for patch in target.patches:
         if any(

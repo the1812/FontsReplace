@@ -21,7 +21,8 @@ names = ["Segoe UI Variable","Segoe UI Variable Display","Segoe UI Variable Text
 files = ["SegUIVar.ttf","SegUIVarSemibold.ttf"]
 group = "en"
 regular_weights = [300,350]
-static_family = "Segoe UI Variable"
+variable_family = "Segoe UI Variable"
+variable_files = ["SegUIVar.ttf"]
 
 [[families.patches]]
 weight = 600

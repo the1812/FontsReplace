@@ -51,7 +51,8 @@ class Family:
   regular_weights: tuple[int, ...]
   patches: tuple[Patch, ...]
   enabled: bool = True
-  static_family: str | None = None
+  variable_family: str | None = None
+  variable_files: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,10 @@ class Task:
   target_axes: dict[str, float]
   reason: str
   patch: Patch | None = None
+
+  @property
+  def variable(self) -> bool:
+    return bool(self.source.axes.keys() - self.source_axes.keys())
 
   @property
   def identity(self) -> tuple[str, int, int, str]:

@@ -24,8 +24,6 @@ def json_value(value):
 
 
 def check_output(plan: Plan, output: Path) -> None:
-  if output.exists():
-    raise ValueError(f"Output already exists; choose a new directory: {output}")
   for source in (plan.system_dir, plan.input_dir, system_directory()):
     if output.is_relative_to(source) or source.is_relative_to(output):
       raise ValueError(f"Output must be separate from font sources: {source}")
@@ -135,7 +133,11 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
             "source": record(task.source),
             "source_axes": task.source_axes,
             "target_axes": task.target_axes,
-            "static_replacement": bool(task.template.axes),
+            "static_replacement": bool(
+              task.template.axes or task.target.variable_family
+            )
+            and not task.variable,
+            "variable_output": task.variable,
             "selection": task.reason,
             **report,
           }
@@ -165,5 +167,7 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
       manifest["outputs"].append(
         {"file": target.name, "sha256": digest(destination), "members": reports}
       )
-    delivery.rename(output)
+    output.mkdir(parents=True, exist_ok=True)
+    for path in delivery.iterdir():
+      path.replace(output / path.name)
   return manifest

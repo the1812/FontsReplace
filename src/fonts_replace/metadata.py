@@ -33,12 +33,13 @@ WEIGHTS = {
 
 
 def instantiate(font: TTFont, axes: dict[str, float]) -> TTFont:
-  if "fvar" in font:
+  if "fvar" in font and axes:
     instantiateVariableFont(font, axes, inplace=True, updateFontNames=False)
-  for tag in ("STAT", "DSIG"):
+  for tag in ("DSIG",) if "fvar" in font else ("STAT", "DSIG"):
     if tag in font:
       del font[tag]
-  font["name"].removeNames(nameID=25)
+  if "fvar" not in font:
+    font["name"].removeNames(nameID=25)
   return font
 
 
@@ -60,6 +61,9 @@ class NameRemapper(TTVisitor):
 
 
 def transplant_names(font: TTFont, template: TTFont) -> None:
+  if "fvar" in font:
+    for instance in font["fvar"].instances:
+      instance.postscriptNameID = 65535
   visitor = NameRecordVisitor()
   visitor.visit(font)
   references = visitor.seen - {0, 65535}
@@ -73,7 +77,7 @@ def transplant_names(font: TTFont, template: TTFont) -> None:
   offset = max(255, max(record.nameID for record in font["name"].names)) + 1
   if references and max(references) + offset > 32767:
     raise ValueError("Not enough custom name IDs for replacement layout features")
-  for tag in ("GSUB", "GPOS", "CPAL"):
+  for tag in NameRecordVisitor.TABLES:
     if tag in font:
       NameRemapper(offset).visit(font[tag])
   for name_id in references:
@@ -121,7 +125,7 @@ def set_identity(font: TTFont, task: Task) -> None:
       1, platform, encoding, language
     )
     family = local.toUnicode() if local else task.family
-    if task.target.static_family:
+    if task.target.variable_family:
       family = task.family
     elif not name.getName(16, platform, encoding, language):
       for suffix in (
@@ -184,11 +188,31 @@ def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
   font.getTableData("glyf")
   font["maxp"].recalc(font)
   transplant_names(font, template)
-  derived = task.patch is not None or bool(task.template.axes)
+  derived = task.patch is not None or bool(task.template.axes) or task.variable
   if derived:
     set_identity(font, task)
     font["name"].removeUnusedNames(font)
+  if task.variable:
+    font["name"].setName(
+      "".join(char for char in task.family if char.isascii() and char.isalnum()),
+      25,
+      3,
+      1,
+      1033,
+    )
+    if "MVAR" in font:
+      mvar = font["MVAR"].table
+      mvar.ValueRecord = [
+        record
+        for record in mvar.ValueRecord
+        if record.ValueTag
+        not in ("hasc", "hdsc", "hlgp", "hcla", "hcld", "hcrs", "hcrn", "hcof")
+      ]
+      mvar.ValueRecordCount = len(mvar.ValueRecord)
+      if not mvar.ValueRecord:
+        del font["MVAR"]
   os2 = font["OS/2"]
+  source_ascent, source_descent = os2.usWinAscent, os2.usWinDescent
   original = template["OS/2"]
   os2.usWeightClass = task.weight
   os2.usWidthClass = task.width
@@ -216,11 +240,14 @@ def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
   for tag, fields in before.items():
     for field, value in fields.items():
       setattr(font[tag], field, round(value * ratio))
-  clipping_expanded = (
-    font["head"].yMax > os2.usWinAscent or -font["head"].yMin > os2.usWinDescent
+  clipping = os2.usWinAscent, os2.usWinDescent
+  os2.usWinAscent = max(
+    os2.usWinAscent, font["head"].yMax, source_ascent if task.variable else 0
   )
-  os2.usWinAscent = max(os2.usWinAscent, font["head"].yMax)
-  os2.usWinDescent = max(os2.usWinDescent, -font["head"].yMin)
+  os2.usWinDescent = max(
+    os2.usWinDescent, -font["head"].yMin, source_descent if task.variable else 0
+  )
+  clipping_expanded = clipping != (os2.usWinAscent, os2.usWinDescent)
   os2.recalcUnicodeRanges(font)
   if os2.version >= 1:
     os2.recalcCodePageRanges(font)

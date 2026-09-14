@@ -28,21 +28,20 @@ def main() -> int:
   fetch_parser = subparsers.add_parser("fetch", help="Download a preset's fonts")
   fetch_parser.add_argument("preset", type=Path)
   fetch_parser.add_argument("--input-dir", type=Path)
-  for command in ("plan", "build"):
-    command_parser = subparsers.add_parser(command)
-    command_parser.add_argument("--preset", type=Path, required=True)
-    command_parser.add_argument("--system-dir", type=Path, default=system_directory())
-    command_parser.add_argument("--input-dir", type=Path)
-    command_parser.add_argument(
-      "--targets", type=Path, help="Custom system target TOML"
-    )
-    command_parser.add_argument(
-      "--family",
-      action="append",
-      help="Select a target id; repeat for multiple targets",
-    )
-    if command == "build":
-      command_parser.add_argument("--output", type=Path, default=Path("replacements"))
+  build_parser = subparsers.add_parser("build", help="Generate replacement fonts")
+  build_parser.add_argument("--preset", type=Path, required=True)
+  build_parser.add_argument("--system-dir", type=Path, default=system_directory())
+  build_parser.add_argument("--input-dir", type=Path)
+  build_parser.add_argument("--targets", type=Path, help="Custom system target TOML")
+  build_parser.add_argument(
+    "--family",
+    action="append",
+    help="Select a target id; repeat for multiple targets",
+  )
+  build_parser.add_argument("--output", type=Path, default=Path("replacements"))
+  build_parser.add_argument(
+    "--dry-run", action="store_true", help="Print the build plan without writing fonts"
+  )
   args = parser.parse_args()
   try:
     if args.command == "inspect":
@@ -64,7 +63,7 @@ def main() -> int:
     plan = make_plan(
       args.system_dir.resolve(), preset, read_targets(args.targets), args.family
     )
-    if args.command == "plan":
+    if args.dry_run:
       print(json.dumps(plan, default=json_value, ensure_ascii=False, indent=2))
     else:
       result = build(
