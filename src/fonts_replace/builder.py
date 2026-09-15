@@ -113,11 +113,6 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
           continue
         task = member
         path = work / f"result-{index}-{member_index}.ttf"
-        template_path = (
-          instance(task.template, task.target_axes)
-          if task.template.axes
-          else extract(task.template)
-        )
         with (
           TTFont(
             instance(task.source, task.source_axes),
@@ -126,7 +121,11 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
             recalcTimestamp=False,
           ) as font,
           TTFont(
-            template_path, lazy=True, recalcBBoxes=False, recalcTimestamp=False
+            task.template.path,
+            fontNumber=task.template.index,
+            lazy=True,
+            recalcBBoxes=False,
+            recalcTimestamp=False,
           ) as template,
         ):
           report = apply_metadata(font, template, task)

@@ -2,10 +2,16 @@ from copy import deepcopy
 from itertools import pairwise
 from struct import unpack_from
 
+from fontTools.misc.roundTools import otRound
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables._n_a_m_e import NameRecordVisitor
 from fontTools.ttLib.ttVisitor import TTVisitor
-from fontTools.varLib.instancer import instantiateVariableFont
+from fontTools.varLib.instancer import (
+  instantiateVariableFont,
+  verticalMetricsKeptInSync,
+)
+from fontTools.varLib.mvar import MVAR_ENTRIES
+from fontTools.varLib.varStore import VarStoreInstancer
 
 from .models import Task
 
@@ -20,6 +26,7 @@ VERTICAL_FIELDS = {
   ),
 }
 VARIABLE_TABLES = ("fvar", "avar", "gvar", "cvar", "HVAR", "VVAR", "MVAR", "VARC")
+METRIC_VARIATIONS = ("hasc", "hdsc", "hlgp", "hcla", "hcld", "hcrs", "hcrn", "hcof")
 WEIGHTS = {
   100: "Thin",
   200: "ExtraLight",
@@ -193,7 +200,25 @@ def vertical_metrics(font: TTFont) -> dict[str, dict[str, int]]:
   }
 
 
+def apply_template_metrics(template: TTFont, axes: dict[str, float]) -> None:
+  if not axes or "MVAR" not in template:
+    return
+  mvar = template["MVAR"].table
+  variations = VarStoreInstancer(
+    mvar.VarStore, template["fvar"].axes, template.normalizeLocation(axes)
+  )
+  with verticalMetricsKeptInSync(template):
+    for record in mvar.ValueRecord:
+      if record.ValueTag in METRIC_VARIATIONS:
+        tag, field = MVAR_ENTRIES[record.ValueTag]
+        table = template[tag]
+        setattr(
+          table, field, getattr(table, field) + otRound(variations[record.VarIdx])
+        )
+
+
 def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
+  apply_template_metrics(template, task.target_axes)
   if task.family.casefold() == "segoe ui":
     cmap = font.getBestCmap() or {}
     ratio_name, colon_name = cmap.get(0x2236), cmap.get(0x003A)
@@ -215,6 +240,8 @@ def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
         font.getTableData("glyf")
         font["maxp"].recalc(font)
   transplant_names(font, template)
+  if not task.variable:
+    font["name"].removeNames(nameID=25)
   derived = task.patch is not None or bool(task.template.axes) or task.variable
   if derived:
     set_identity(font, task)
@@ -237,8 +264,7 @@ def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
       mvar.ValueRecord = [
         record
         for record in mvar.ValueRecord
-        if record.ValueTag
-        not in ("hasc", "hdsc", "hlgp", "hcla", "hcld", "hcrs", "hcrn", "hcof")
+        if record.ValueTag not in METRIC_VARIATIONS
       ]
       mvar.ValueRecordCount = len(mvar.ValueRecord)
       if not mvar.ValueRecord:
