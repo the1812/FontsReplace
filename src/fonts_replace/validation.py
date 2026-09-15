@@ -1,9 +1,8 @@
 import hashlib
 
 from fontTools.ttLib import TTFont
-from fontTools.ttLib.tables._n_a_m_e import NameRecordVisitor
 
-from .metadata import VARIABLE_TABLES, vertical_metrics
+from .metadata import VARIABLE_TABLES, name_references, vertical_metrics
 
 
 def names(font: TTFont) -> list[tuple]:
@@ -28,7 +27,6 @@ def table_hashes(font: TTFont, tags: tuple[str, ...]) -> dict[str, str]:
 
 
 def snapshot(font: TTFont) -> dict:
-  font.ensureDecompiled()
   return {
     "names": names(font),
     "weight": font["OS/2"].usWeightClass,
@@ -38,7 +36,18 @@ def snapshot(font: TTFont) -> dict:
     "upem": font["head"].unitsPerEm,
     "metrics": vertical_metrics(font),
     "tables": table_hashes(
-      font, ("glyf", "hmtx", "cmap", "GSUB", "GPOS", "GDEF", "STAT", *VARIABLE_TABLES)
+      font,
+      (
+        "glyf",
+        "loca",
+        "hmtx",
+        "cmap",
+        "GSUB",
+        "GPOS",
+        "GDEF",
+        "STAT",
+        *VARIABLE_TABLES,
+      ),
     ),
   }
 
@@ -71,13 +80,14 @@ def validate(font: TTFont, expected: dict, replaced: bool) -> None:
     raise ValueError("Output character map references missing glyphs")
   if set(font["hmtx"].metrics) != glyphs:
     raise ValueError("Output horizontal metrics do not cover all glyphs")
-  for glyph in font["glyf"].glyphs.values():
-    if glyph.isComposite() and any(
-      component.glyphName not in glyphs for component in glyph.components
-    ):
+  glyf = font["glyf"]
+  for glyph in glyf.glyphs.values():
+    if any(component not in glyphs for component in glyph.getComponentNames(glyf)):
       raise ValueError("Output composite references a missing glyph")
-  visitor = NameRecordVisitor()
-  visitor.visit(font)
-  missing = visitor.seen - {record.nameID for record in font["name"].names} - {0, 65535}
+  missing = (
+    name_references(font)
+    - {record.nameID for record in font["name"].names}
+    - {0, 65535}
+  )
   if missing:
     raise ValueError(f"Output contains unresolved name references: {sorted(missing)}")

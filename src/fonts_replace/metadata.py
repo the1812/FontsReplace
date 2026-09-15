@@ -1,4 +1,6 @@
 from copy import deepcopy
+from itertools import pairwise
+from struct import unpack_from
 
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables._n_a_m_e import NameRecordVisitor
@@ -35,12 +37,30 @@ WEIGHTS = {
 def instantiate(font: TTFont, axes: dict[str, float]) -> TTFont:
   if "fvar" in font and axes:
     instantiateVariableFont(font, axes, inplace=True, updateFontNames=False)
+  else:
+    update_bounds(font)
   for tag in ("DSIG",) if "fvar" in font else ("STAT", "DSIG"):
     if tag in font:
       del font[tag]
   if "fvar" not in font:
     font["name"].removeNames(nameID=25)
   return font
+
+
+def update_bounds(font: TTFont) -> None:
+  data = font.getTableData("glyf")
+  offsets = font["loca"].locations
+  bounds = []
+  for start, end in pairwise(offsets):
+    if start != end:
+      contours, *box = unpack_from(">hhhhh", data, start)
+      if contours:
+        bounds.append(box)
+  head = font["head"]
+  head.xMin = min((box[0] for box in bounds), default=0)
+  head.yMin = min((box[1] for box in bounds), default=0)
+  head.xMax = max((box[2] for box in bounds), default=0)
+  head.yMax = max((box[3] for box in bounds), default=0)
 
 
 class NameRemapper(TTVisitor):
@@ -60,13 +80,19 @@ class NameRemapper(TTVisitor):
       super().visitAttr(obj, attr, value, *args, **kwargs)
 
 
+def name_references(font: TTFont) -> set[int]:
+  visitor = NameRecordVisitor()
+  for tag in visitor.TABLES:
+    if tag in font:
+      visitor.visit(font[tag])
+  return visitor.seen
+
+
 def transplant_names(font: TTFont, template: TTFont) -> None:
   if "fvar" in font:
     for instance in font["fvar"].instances:
       instance.postscriptNameID = 65535
-  visitor = NameRecordVisitor()
-  visitor.visit(font)
-  references = visitor.seen - {0, 65535}
+  references = name_references(font) - {0, 65535}
   donor_names = deepcopy(font["name"])
   donor_ltag = deepcopy(font["ltag"]) if "ltag" in font else None
   font["name"] = deepcopy(template["name"])
@@ -185,13 +211,19 @@ def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
           glyph.coordinates.translate((offset, 0))
         glyph.recalcBounds(font["glyf"])
         font["hmtx"][ratio_name] = (width, left)
-  font.getTableData("glyf")
-  font["maxp"].recalc(font)
+        font.recalcBBoxes = True
+        font.getTableData("glyf")
+        font["maxp"].recalc(font)
   transplant_names(font, template)
   derived = task.patch is not None or bool(task.template.axes) or task.variable
   if derived:
     set_identity(font, task)
-    font["name"].removeUnusedNames(font)
+    references = name_references(font)
+    font["name"].names = [
+      record
+      for record in font["name"].names
+      if record.nameID < 256 or record.nameID in references
+    ]
   if task.variable:
     font["name"].setName(
       "".join(char for char in task.family if char.isascii() and char.isalnum()),

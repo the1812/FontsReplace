@@ -70,7 +70,9 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
       if not face.collection:
         originals[face.key] = face.path
         return face.path
-      collection = TTCollection(face.path, recalcTimestamp=False)
+      collection = TTCollection(
+        face.path, lazy=True, recalcBBoxes=False, recalcTimestamp=False
+      )
       try:
         for index, font in enumerate(collection.fonts):
           path = work / f"original-{len(originals)}-{index}.ttf"
@@ -84,7 +86,9 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
       key = face.key + tuple(sorted(axes.items()))
       if key not in instances:
         path = work / f"instance-{len(instances)}.ttf"
-        with TTFont(extract(face), recalcTimestamp=False) as font:
+        with TTFont(
+          extract(face), lazy=True, recalcBBoxes=bool(axes), recalcTimestamp=False
+        ) as font:
           instantiate(font, axes)
           font.save(path)
         instances[key] = path
@@ -98,7 +102,9 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
       for member_index, member in enumerate(target.members):
         if isinstance(member, Face):
           path = extract(member)
-          with TTFont(path, recalcTimestamp=False) as font:
+          with TTFont(
+            path, lazy=True, recalcBBoxes=False, recalcTimestamp=False
+          ) as font:
             expected.append(snapshot(font))
           members.append(path)
           reports.append(
@@ -114,9 +120,14 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
         )
         with (
           TTFont(
-            instance(task.source, task.source_axes), recalcTimestamp=False
+            instance(task.source, task.source_axes),
+            lazy=True,
+            recalcBBoxes=False,
+            recalcTimestamp=False,
           ) as font,
-          TTFont(template_path, recalcTimestamp=False) as template,
+          TTFont(
+            template_path, lazy=True, recalcBBoxes=False, recalcTimestamp=False
+          ) as template,
         ):
           report = apply_metadata(font, template, task)
           expected.append(snapshot(font))
@@ -147,10 +158,13 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
         with ExitStack() as stack:
           collection = TTCollection()
           collection.fonts = [
-            stack.enter_context(TTFont(path, recalcTimestamp=False)) for path in members
+            stack.enter_context(
+              TTFont(path, lazy=True, recalcBBoxes=False, recalcTimestamp=False)
+            )
+            for path in members
           ]
           collection.save(destination)
-        result = TTCollection(destination)
+        result = TTCollection(destination, lazy=True, recalcBBoxes=False)
         try:
           if len(result.fonts) != len(target.members):
             raise ValueError(f"Collection member count changed: {target.name}")
@@ -162,7 +176,7 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
           result.close()
       else:
         members[0].rename(destination)
-        with TTFont(destination) as font:
+        with TTFont(destination, lazy=True, recalcBBoxes=False) as font:
           validate(font, expected[0], True)
       manifest["outputs"].append(
         {"file": target.name, "sha256": digest(destination), "members": reports}
