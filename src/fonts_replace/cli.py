@@ -1,7 +1,9 @@
 import argparse
 import json
 import sys
+from io import TextIOWrapper
 from pathlib import Path
+from typing import cast
 from zipfile import BadZipFile
 
 from fontTools.ttLib import TTLibError
@@ -14,8 +16,8 @@ from .planner import make_plan
 
 
 def main() -> int:
-  sys.stdout.reconfigure(encoding="utf-8")
-  sys.stderr.reconfigure(encoding="utf-8")
+  cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
+  cast(TextIOWrapper, sys.stderr).reconfigure(encoding="utf-8")
   parser = argparse.ArgumentParser(
     description="Generate system-identity fonts from replacement TrueType faces"
   )

@@ -6,19 +6,87 @@ from dataclasses import asdict, is_dataclass
 from importlib.metadata import version
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Literal, TypedDict, cast
 
 from fontTools.ttLib import TTCollection, TTFont
 
 from .config import system_directory
-from .metadata import apply_metadata, instantiate
+from .metadata import CoverageReport, MetricsReport, apply_metadata, instantiate
 from .models import Face, Plan, Task
-from .validation import snapshot, validate
+from .validation import Snapshot, snapshot, validate
 
 
-def json_value(value):
+class AxisReport(TypedDict):
+  minimum: float
+  default: float
+  maximum: float
+
+
+class FaceReport(TypedDict):
+  path: Path
+  index: int
+  collection: bool
+  family: str
+  subfamily: str
+  postscript: str
+  weight: int
+  width: int
+  style: str
+  upem: int
+  version: str
+  axes: dict[str, AxisReport]
+  outline: str
+  sha256: str
+
+
+class PreserveReport(TypedDict):
+  index: int
+  action: Literal["preserve"]
+  original: FaceReport
+
+
+class ReplaceReport(TypedDict):
+  index: int
+  action: Literal["patch", "replace"]
+  family: str
+  weight: int
+  style: str
+  template: FaceReport
+  source: FaceReport
+  source_axes: dict[str, float]
+  target_axes: dict[str, float]
+  static_replacement: bool
+  variable_output: bool
+  selection: str
+  metrics: MetricsReport
+  coverage: CoverageReport
+
+
+MemberReport = PreserveReport | ReplaceReport
+
+
+class OutputReport(TypedDict):
+  file: str
+  sha256: str
+  members: list[MemberReport]
+
+
+class BuildReport(TypedDict):
+  schema: int
+  tool: str
+  version: str
+  python: str
+  fonttools: str
+  system_dir: Path
+  input_dir: Path
+  skipped: list[str]
+  outputs: list[OutputReport]
+
+
+def json_value(value: object) -> str | dict[str, object]:
   if isinstance(value, Path):
     return value.as_posix()
-  if is_dataclass(value):
+  if is_dataclass(value) and not isinstance(value, type):
     return asdict(value)
   raise TypeError(f"Cannot serialize {type(value).__name__}")
 
@@ -31,7 +99,9 @@ def check_output(plan: Plan, output: Path) -> None:
     raise ValueError("No matching system fonts to generate")
 
 
-def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> dict:
+def build(
+  plan: Plan, output: Path, progress: Callable[[str], None] = print
+) -> BuildReport:
   output = output.resolve()
   check_output(plan, output)
   output.parent.mkdir(parents=True, exist_ok=True)
@@ -43,10 +113,10 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
         hashes[path] = hashlib.file_digest(stream, "sha256").hexdigest()
     return hashes[path]
 
-  def record(face: Face) -> dict:
-    return asdict(face) | {"sha256": digest(face.path)}
+  def record(face: Face) -> FaceReport:
+    return cast(FaceReport, asdict(face) | {"sha256": digest(face.path)})
 
-  manifest = {
+  manifest: BuildReport = {
     "schema": 1,
     "tool": "fonts_replace",
     "version": version("fonts_replace"),
@@ -62,7 +132,7 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
     delivery = work / "output"
     delivery.mkdir()
     originals: dict[tuple[Path, int], Path] = {}
-    instances: dict[tuple, Path] = {}
+    instances: dict[tuple[Path, int, tuple[tuple[str, float], ...]], Path] = {}
 
     def extract(face: Face) -> Path:
       if face.key in originals:
@@ -83,7 +153,7 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
       return originals[face.key]
 
     def instance(face: Face, axes: dict[str, float]) -> Path:
-      key = face.key + tuple(sorted(axes.items()))
+      key = (face.path, face.index, tuple(sorted(axes.items())))
       if key not in instances:
         path = work / f"instance-{len(instances)}.ttf"
         with TTFont(
@@ -97,8 +167,8 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
     for index, target in enumerate(plan.outputs):
       progress(f"[{index + 1}/{len(plan.outputs)}] {target.name}")
       members: list[Path] = []
-      expected: list[dict] = []
-      reports: list[dict] = []
+      expected: list[Snapshot] = []
+      reports: list[MemberReport] = []
       for member_index, member in enumerate(target.members):
         if isinstance(member, Face):
           path = extract(member)
@@ -107,9 +177,12 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
           ) as font:
             expected.append(snapshot(font))
           members.append(path)
-          reports.append(
-            {"index": member_index, "action": "preserve", "original": record(member)}
-          )
+          preserved: PreserveReport = {
+            "index": member_index,
+            "action": "preserve",
+            "original": record(member),
+          }
+          reports.append(preserved)
           continue
         task = member
         path = work / f"result-{index}-{member_index}.ttf"
@@ -128,30 +201,28 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
             recalcTimestamp=False,
           ) as template,
         ):
-          report = apply_metadata(font, template, task)
+          metadata_report = apply_metadata(font, template, task)
           expected.append(snapshot(font))
           font.save(path)
         members.append(path)
-        reports.append(
-          {
-            "index": member_index,
-            "action": "patch" if task.patch else "replace",
-            "family": task.family,
-            "weight": task.weight,
-            "style": task.style,
-            "template": record(task.template),
-            "source": record(task.source),
-            "source_axes": task.source_axes,
-            "target_axes": task.target_axes,
-            "static_replacement": bool(
-              task.template.axes or task.target.variable_family
-            )
-            and not task.variable,
-            "variable_output": task.variable,
-            "selection": task.reason,
-            **report,
-          }
-        )
+        generated: ReplaceReport = {
+          "index": member_index,
+          "action": "patch" if task.patch else "replace",
+          "family": task.family,
+          "weight": task.weight,
+          "style": task.style,
+          "template": record(task.template),
+          "source": record(task.source),
+          "source_axes": task.source_axes,
+          "target_axes": task.target_axes,
+          "static_replacement": bool(task.template.axes or task.target.variable_family)
+          and not task.variable,
+          "variable_output": task.variable,
+          "selection": task.reason,
+          "metrics": metadata_report["metrics"],
+          "coverage": metadata_report["coverage"],
+        }
+        reports.append(generated)
       destination = delivery / target.name
       if target.name.lower().endswith(".ttc"):
         with ExitStack() as stack:
@@ -177,9 +248,12 @@ def build(plan: Plan, output: Path, progress: Callable[[str], None] = print) -> 
         members[0].rename(destination)
         with TTFont(destination, lazy=True, recalcBBoxes=False) as font:
           validate(font, expected[0], True)
-      manifest["outputs"].append(
-        {"file": target.name, "sha256": digest(destination), "members": reports}
-      )
+      output_report: OutputReport = {
+        "file": target.name,
+        "sha256": digest(destination),
+        "members": reports,
+      }
+      manifest["outputs"].append(output_report)
     output.mkdir(parents=True, exist_ok=True)
     for path in delivery.iterdir():
       path.replace(output / path.name)

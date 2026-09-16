@@ -75,7 +75,7 @@ class Mapping:
   group: str | None = None
   source_weight: int | None = None
   source_style: str | None = None
-  axes: dict[str, float] = field(default_factory=dict)
+  axes: dict[str, float] = field(default_factory=lambda: {})
 
 
 @dataclass(frozen=True)

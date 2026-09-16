@@ -1,6 +1,7 @@
 from copy import deepcopy
 from itertools import pairwise
 from struct import unpack_from
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from fontTools.misc.roundTools import otRound
 from fontTools.ttLib import TTFont
@@ -14,6 +15,10 @@ from fontTools.varLib.mvar import MVAR_ENTRIES
 from fontTools.varLib.varStore import VarStoreInstancer
 
 from .models import Task
+
+if TYPE_CHECKING:
+  from fontTools.ttLib import GlyphComponent
+
 
 VERTICAL_FIELDS = {
   "hhea": ("ascent", "descent", "lineGap"),
@@ -40,6 +45,28 @@ WEIGHTS = {
   900: "Black",
 }
 
+VerticalMetrics = dict[str, dict[str, int]]
+
+
+class MetricsReport(TypedDict):
+  policy: str
+  scale: float
+  original: VerticalMetrics
+  output: VerticalMetrics
+  use_typo_metrics: bool
+  clipping_expanded: bool
+
+
+class CoverageReport(TypedDict):
+  original: int
+  output: int
+  lost: int
+
+
+class MetadataReport(TypedDict):
+  metrics: MetricsReport
+  coverage: CoverageReport
+
 
 def instantiate(font: TTFont, axes: dict[str, float]) -> TTFont:
   if "fvar" in font and axes:
@@ -57,12 +84,12 @@ def instantiate(font: TTFont, axes: dict[str, float]) -> TTFont:
 def update_bounds(font: TTFont) -> None:
   data = font.getTableData("glyf")
   offsets = font["loca"].locations
-  bounds = []
+  bounds: list[tuple[int, int, int, int]] = []
   for start, end in pairwise(offsets):
     if start != end:
-      contours, *box = unpack_from(">hhhhh", data, start)
+      contours, x_min, y_min, x_max, y_max = unpack_from(">hhhhh", data, start)
       if contours:
-        bounds.append(box)
+        bounds.append((x_min, y_min, x_max, y_max))
   head = font["head"]
   head.xMin = min((box[0] for box in bounds), default=0)
   head.yMin = min((box[1] for box in bounds), default=0)
@@ -74,14 +101,17 @@ class NameRemapper(TTVisitor):
   def __init__(self, offset: int):
     self.offset = offset
 
-  def visitAttr(self, obj, attr, value, *args, **kwargs):
-    if attr.endswith("NameID") and 256 <= value < 65535:
-      setattr(obj, attr, value + self.offset)
+  def visitAttr(
+    self, obj: object, attr: str, value: object, *args: object, **kwargs: object
+  ) -> bool | None:
+    if attr.endswith("NameID") and 256 <= cast(int, value) < 65535:
+      setattr(obj, attr, cast(int, value) + self.offset)
     elif attr in ("paletteLabels", "paletteEntryLabels"):
+      labels = cast(list[int], value)
       setattr(
         obj,
         attr,
-        [item + self.offset if 256 <= item < 65535 else item for item in value],
+        [item + self.offset if 256 <= item < 65535 else item for item in labels],
       )
     else:
       super().visitAttr(obj, attr, value, *args, **kwargs)
@@ -193,7 +223,7 @@ def set_identity(font: TTFont, task: Task) -> None:
       name.setName(value, name_id, platform, encoding, language)
 
 
-def vertical_metrics(font: TTFont) -> dict[str, dict[str, int]]:
+def vertical_metrics(font: TTFont) -> VerticalMetrics:
   return {
     tag: {field: getattr(font[tag], field) for field in fields}
     for tag, fields in VERTICAL_FIELDS.items()
@@ -217,7 +247,7 @@ def apply_template_metrics(template: TTFont, axes: dict[str, float]) -> None:
         )
 
 
-def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
+def apply_metadata(font: TTFont, template: TTFont, task: Task) -> MetadataReport:
   apply_template_metrics(template, task.target_axes)
   if task.family.casefold() in {"segoe ui", "segoe ui variable"}:
     cmap = font.getBestCmap() or {}
@@ -231,7 +261,7 @@ def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
         if glyph.isComposite():
           for component in glyph.components:
             if hasattr(component, "x"):
-              component.x += offset
+              cast("GlyphComponent", component).x += offset
         else:
           glyph.coordinates.translate((offset, 0))
         glyph.recalcBounds(font["glyf"])
@@ -317,18 +347,17 @@ def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
   if os2.version >= 2:
     os2.usDefaultChar = 0
     os2.usBreakChar = 32 if 32 in codepoints else 0
-  return {
-    "metrics": {
-      "policy": "system-with-glyph-bounds",
-      "scale": ratio,
-      "original": before,
-      "output": vertical_metrics(font),
-      "use_typo_metrics": bool(os2.fsSelection & 128),
-      "clipping_expanded": clipping_expanded,
-    },
-    "coverage": {
-      "original": len(original_codepoints),
-      "output": len(codepoints),
-      "lost": len(original_codepoints - codepoints),
-    },
+  metrics: MetricsReport = {
+    "policy": "system-with-glyph-bounds",
+    "scale": ratio,
+    "original": before,
+    "output": vertical_metrics(font),
+    "use_typo_metrics": bool(os2.fsSelection & 128),
+    "clipping_expanded": clipping_expanded,
   }
+  coverage: CoverageReport = {
+    "original": len(original_codepoints),
+    "output": len(codepoints),
+    "lost": len(original_codepoints - codepoints),
+  }
+  return {"metrics": metrics, "coverage": coverage}

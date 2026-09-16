@@ -1,11 +1,39 @@
 import hashlib
+from typing import Literal, TypedDict
 
 from fontTools.ttLib import TTFont
 
 from .metadata import VARIABLE_TABLES, name_references, vertical_metrics
 
+NameSnapshot = tuple[int, int, int, int, str]
 
-def names(font: TTFont) -> list[tuple]:
+
+class Snapshot(TypedDict):
+  names: list[NameSnapshot]
+  weight: int
+  width: int
+  selection: int
+  mac_style: int
+  upem: int
+  metrics: dict[str, dict[str, int]]
+  tables: dict[str, str]
+
+
+SnapshotField = Literal[
+  "names", "weight", "width", "selection", "mac_style", "upem", "metrics"
+]
+SNAPSHOT_FIELDS: tuple[SnapshotField, ...] = (
+  "names",
+  "weight",
+  "width",
+  "selection",
+  "mac_style",
+  "upem",
+  "metrics",
+)
+
+
+def names(font: TTFont) -> list[NameSnapshot]:
   return sorted(
     (
       record.nameID,
@@ -26,7 +54,7 @@ def table_hashes(font: TTFont, tags: tuple[str, ...]) -> dict[str, str]:
   }
 
 
-def snapshot(font: TTFont) -> dict:
+def snapshot(font: TTFont) -> Snapshot:
   return {
     "names": names(font),
     "weight": font["OS/2"].usWeightClass,
@@ -52,16 +80,18 @@ def snapshot(font: TTFont) -> dict:
   }
 
 
-def validate(font: TTFont, expected: dict, replaced: bool) -> None:
+def validate(font: TTFont, expected: Snapshot, replaced: bool) -> None:
   actual = snapshot(font)
-  for field, value in expected.items():
-    if actual[field] != value:
-      detail = (
-        [tag for tag, digest in value.items() if actual[field].get(tag) != digest]
-        if field == "tables"
-        else field
-      )
-      raise ValueError(f"Output validation failed: {detail}")
+  for field in SNAPSHOT_FIELDS:
+    if actual[field] != expected[field]:
+      raise ValueError(f"Output validation failed: {field}")
+  if actual["tables"] != expected["tables"]:
+    detail = [
+      tag
+      for tag, digest in expected["tables"].items()
+      if actual["tables"].get(tag) != digest
+    ]
+    raise ValueError(f"Output validation failed: {detail}")
   if not replaced:
     return
   if (

@@ -20,8 +20,16 @@ indent-width = 2
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM", "FURB", "RUF"]
 
+[tool.pyright]
+include = ["src", "typings"]
+typeCheckingMode = "strict"
+pythonVersion = "3.12"
+pythonPlatform = "Windows"
+venvPath = "."
+venv = ".venv"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/fonts_replace"]
 
 [dependency-groups]
-dev = ["ruff>=0.16.7"]
+dev = ["pyright>=1.1.414", "ruff>=0.16.7"]
