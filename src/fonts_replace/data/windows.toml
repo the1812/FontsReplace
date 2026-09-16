@@ -114,3 +114,9 @@ id = "ms-mincho"
 names = ["MS Mincho","MS PMincho"]
 files = ["msmincho.ttc"]
 group = "ja"
+
+[[families]]
+id = "ms-gothic"
+names = ["MS Gothic","MS UI Gothic","MS PGothic"]
+files = ["msgothic.ttc"]
+group = "ja"

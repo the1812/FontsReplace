@@ -219,7 +219,7 @@ def apply_template_metrics(template: TTFont, axes: dict[str, float]) -> None:
 
 def apply_metadata(font: TTFont, template: TTFont, task: Task) -> dict:
   apply_template_metrics(template, task.target_axes)
-  if task.family.casefold() == "segoe ui":
+  if task.family.casefold() in {"segoe ui", "segoe ui variable"}:
     cmap = font.getBestCmap() or {}
     ratio_name, colon_name = cmap.get(0x2236), cmap.get(0x003A)
     if ratio_name and colon_name and ratio_name != colon_name:
