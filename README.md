@@ -2,6 +2,15 @@
 
 基于 [HarmonyOS Sans](https://developer.huawei.com/consumer/cn/design/resource-V1/) 生成可用于替换 Windows 系统字体的字体文件。
 
+> 主要针对简体中文环境 (默认系统字体为微软雅黑) 优化，微软雅黑是专为低分辨率下配合 ClearType 优化笔画清晰度的一个特殊字体，在字形上看起来会比较怪，因此建议在屏幕分辨率大于等于 4K 时替换为其他更为成熟的中文 UI 字体，替换后可有效改善系统观感。也可以搭配 [noMeiryoUI](https://github.com/Tatsu-syo/noMeiryoUI) 和 [MacType](https://github.com/snowie2000/mactype) 进一步优化其他细节效果。
+
+## 替换效果
+
+<img alt="explorer-ribbon" src="assets/explorer-ribbon.png" width="600px">
+
+<img alt="start-menu" src="assets/start-menu.png" height="500px">
+<img alt="taskbar-context-menu" src="assets/taskbar-context-menu.png" height="500px">
+
 ## 使用方式
 
 > 需要系统中已安装 [uv](https://docs.astral.sh/uv/getting-started/installation/) 和 [Python 3.14](https://www.python.org/downloads/windows/)
